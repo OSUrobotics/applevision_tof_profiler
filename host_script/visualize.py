@@ -7,6 +7,7 @@ from matplotlib.patches import Circle
 from mpl_toolkits.mplot3d import art3d, Axes3D
 
 DATA = Path(__file__).parent.joinpath('../data')
+SENSOR = 'lidar'
 # DATA = Path(__file__).parent.joinpath('apple30mm.csv')
 
 if __name__ == '__main__':
@@ -20,8 +21,8 @@ if __name__ == '__main__':
 
         # average every distance
         df = df.groupby(['x', 'y'], as_index=False).median()
-        mindist = df['lidar'].min()
-        maxdist = df['lidar'].max()
+        mindist = df[SENSOR].min()
+        maxdist = df[SENSOR].max()
         # df['lidar'] = 1024 - df['lidar']
 
         # convert to mesh grid
@@ -31,12 +32,12 @@ if __name__ == '__main__':
         z = np.zeros(x.shape)
 
         for (ix, vx), (iy, vy) in itertools.product(enumerate(x_vals), enumerate(y_vals)):
-            z[iy, ix] = df[(df['x'] == vx) & (df['y'] == vy)]['lidar'].iloc[0]
+            z[iy, ix] = df[(df['x'] == vx) & (df['y'] == vy)][SENSOR].iloc[0]
 
 
         fig = plt.figure()
         ax = plt.axes(projection='3d')
-        ax.plot_surface(x, y, z, rstride=1, cstride=1, cmap='viridis', edgecolor='none')
+        ax.plot_surface(x, y, z, rstride=1, cstride=1, cmap='plasma', edgecolor='none')
         ax.set_title(f'{p.stem} min={mindist} max={maxdist}')
         
         # p = Circle((67, 55), 40, ec='k', fc="none")

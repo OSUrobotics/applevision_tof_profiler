@@ -12,7 +12,7 @@ import pandas as pd
 from penplotter import Point, PenPlotter
 
 
-CNC_PORT = 'COM3'
+CNC_PORT = 'COM6'
 ARDUINO_PORT = 'COM4'
 CNC_BAUD = ARDUINO_BAUD = 115200
 
@@ -60,9 +60,9 @@ class DataPoint(NamedTuple):
         return DataPoint(p.x, p.y, r.intensity, r.ultra, r.lidar)
 
 def point_grid_zigzag(gridsize: int, gridinc: int) -> Generator[Point, None, None]:
-    for x in range(0, gridsize + gridinc, gridinc):
+    for i, x in enumerate(range(0, gridsize + gridinc, gridinc)):
         itery = range(0, gridsize + gridinc, gridinc)
-        if x % 2 != 0:
+        if i % 2 != 0:
             itery = reversed(itery)
         for y in itery:
             yield Point(x, y)
@@ -112,7 +112,7 @@ if __name__ == '__main__':
         plotter.move_and_stop(Point(-1, 0))
         time.sleep(1)
 
-        for point in point_grid_zigzag(100, 5):
+        for point in point_grid_zigzag(160, 4):
             plotter.move_and_stop(point)
 
             points = []
