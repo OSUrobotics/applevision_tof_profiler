@@ -1,3 +1,10 @@
+"""
+Pen plotter control script. Adjust the ports then run to automatically
+collect a scan of a GRID_MM_SIZE x GRID_MM_SIZE grid in GRID_MM_INC
+increments. Outputs the data to a CSV file and plots the lidar live
+as it scans.
+"""
+
 import time
 import json
 from typing import Generator, NamedTuple, Optional
@@ -11,16 +18,24 @@ import pandas as pd
 
 from penplotter import Point, PenPlotter
 
-
-CNC_PORT = 'COM6'
+# Serial ports, likley need adjusting per computer
+CNC_PORT = 'COM3'
 ARDUINO_PORT = 'COM4'
+# baud rate to use for serial ports
 CNC_BAUD = ARDUINO_BAUD = 115200
+# Grid scanning settings
+GRID_MM_SIZE = 160
+GRID_MM_INC = 4
+# Number of times to scan per grid point
+SCAN_COUNT_PER = 5
+
 
 ARDUINO_TAKE_READING = b'm'
 ARDUINO_CHECK_OK = b'r'
 ARDUINO_FAIL = b'fail'
 
 class SerialDebugProxy(serial.Serial):
+    """Repeats serial commuication to stdout for debugging"""
     PREFIX = ''
 
     def write(self, data: bytes) -> int:
@@ -60,6 +75,7 @@ class DataPoint(NamedTuple):
         return DataPoint(p.x, p.y, r.intensity, r.ultra, r.lidar)
 
 def point_grid_zigzag(gridsize: int, gridinc: int) -> Generator[Point, None, None]:
+    """Yield points in a gridsize by gridsize grid traversing in a zigzag"""
     for i, x in enumerate(range(0, gridsize + gridinc, gridinc)):
         itery = range(0, gridsize + gridinc, gridinc)
         if i % 2 != 0:
@@ -112,11 +128,11 @@ if __name__ == '__main__':
         plotter.move_and_stop(Point(-1, 0))
         time.sleep(1)
 
-        for point in point_grid_zigzag(160, 4):
+        for point in point_grid_zigzag(GRID_MM_SIZE, GRID_MM_INC):
             plotter.move_and_stop(point)
 
             points = []
-            for _ in range(5):
+            for _ in range(SCAN_COUNT_PER):
                 measure = take_reading(arduinoser)
                 points.append(DataPoint.factory(point, measure))
             lidar_points = pd.concat((lidar_points, pd.DataFrame.from_records(points, columns=DataPoint._fields)), ignore_index=True)

@@ -25,6 +25,10 @@ class InvalidStateError(CommError):
     pass
 
 class PenPlotter():
+    """
+    Driver for a pen plotter running grbl v1.1h or later. Moves the pen plotter to a
+    specific point and blocks until the movement is complete.
+    """
     def __init__(self, ser: serial.Serial) -> None:
         self.ser = ser
 
@@ -49,6 +53,13 @@ class PenPlotter():
 
 
     def move_and_stop(self, pos: Point, speed: int = 1000):
+        # There's no universal way to tell when a CNC has stopped moving, so
+        # this function uses a grbl-specific trick where we can tell if a jog
+        # command is currently running because it will throw an error if we
+        # try to execute anything else during it. See 
+        # https://github.com/gnea/grbl/blob/master/doc/markdown/jogging.md
+        # for more info.
+
         command = f'$J=G90X{pos.x}Y{pos.y}F{speed}'.encode('ascii') + ENDLINE
         wait_command = b'G4P0.01' + ENDLINE
 

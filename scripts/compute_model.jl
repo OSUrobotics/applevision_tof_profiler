@@ -1,6 +1,10 @@
-# using Pkg
-# Pkg.add("JSON")
-# Pkg.add("StaticArrays")
+"""
+ToF sensor model v1 and v2, implemented in Julia so it's much
+faster. See the handoff document for more info.
+
+Julia's plotting isn't great, so this file outputs JSON which
+can be plugged into plot_model.py for visualization.
+"""
 
 using LinearAlgebra
 using Base.Threads
@@ -8,8 +12,8 @@ using JSON
 using StaticArrays
 using StatsBase
 using Plots; pyplot()
-# using Profile
 
+# Using this data structure increases speed by ~10x
 const Vector3 = SVector{3, Float64}
 
 function magnitude_vec(v::Vector3)::Float64
@@ -22,6 +26,11 @@ function normalize_vec(v::Vector3)::Float64
 end
 
 function line_sphere_intersection(line_origin::Vector3, line_slope_unit::Vector3, sphere_origin::Vector3, sphere_radius::Float64)::Float64
+    """
+    Given a slope/origin 3D line and a radius/origin sphere, get
+    the closest distance from the origin of the line that they
+    intersect. Return NaN64 if there is no intersection.
+    """ 
     origin_diff = line_origin - sphere_origin
     ls_dot_ordiff = dot(line_slope_unit, origin_diff)
     grad = (ls_dot_ordiff^2) - (magnitude_vec(origin_diff)^2 - sphere_radius^2)
@@ -37,6 +46,8 @@ function line_sphere_intersection(line_origin::Vector3, line_slope_unit::Vector3
 end
 
 function line_direction_from_angle(angleR::Float64, angleTheda::Float64)::Vector3
+    """Given polar angles R and theda, compute a normalized
+    slope vector for a line in that direction."""
     angleR = deg2rad(angleR)
     angleTheda = deg2rad(angleTheda)
     z = cos(angleR)
@@ -47,10 +58,12 @@ function line_direction_from_angle(angleR::Float64, angleTheda::Float64)::Vector
 end
 
 function find_line_at_z_intersect(line_origin::Vector3, line_slope_unit::Vector3, z::Float64)
+    """Find the distance from the lines origin to a given Z value"""
     return abs(z - line_origin[3]) / line_slope_unit[3]
 end
 
 function area_of_intersecting_circles(rad_1::Float64, rad_2::Float64, center_dist::Float64)::Float64
+    """Find the intersecting area of two circles. Return NaN64 if circles do not intersect.""" 
     if center_dist <= max(rad_1, rad_2) - min(rad_1, rad_2)
         return pi * min(rad_1, rad_2)^2
     end
@@ -70,6 +83,7 @@ function area_of_intersecting_circles(rad_1::Float64, rad_2::Float64, center_dis
 end
 
 function calc_per_apple_in_fov(apple_pos::Vector3, fov_rad::Float64, apple_rad::Float64)::Float64
+    """Given the position of a spherical apple and the FOV cone, compute % of FOV covered by apple"""
     fov_at_apple_rad = apple_pos[3]*tan(fov_rad / 2)
     area_apple_in_fov = area_of_intersecting_circles(apple_rad, fov_at_apple_rad, sqrt(apple_pos[1]^2 + apple_pos[2]^2))
     if isnan(area_apple_in_fov)
@@ -109,13 +123,6 @@ function area_scan_model(sphere_origin::Vector3, sphere_rad::Float64, backdrop_z
     end
 
     return sum(computed_mes) / length(computed_mes)
-
-    # sort!(computed_mes, rev=true)
-    # sort!(computed_mes, rev=true)
-    # half_len = length(computed_mes) ÷ 2
-    # return sum(computed_mes[1:half_len]) / half_len
-    # half_len = length(computed_mes) ÷ 2
-    # return sum(computed_mes[1:half_len]) / half_len
 end
 
 function simplified_model(sphere_origin::Vector3, sphere_rad::Float64, sensor_fov_rad::Float64, backdrop_z::Float64, sensor_origin::Vector3)::Float64
@@ -148,6 +155,7 @@ const SPHERE_R = 40.0
 const CLOSE_WGT = .1
 
 function run_model(sphere_offset, backdrop_offset)
+    """Scan the v1 model. Very slow."""
     x = 0:SCAN_STEP:SCAN_WH
     sphere_origin = Vector3(SCAN_WH/2, SCAN_WH/2, sphere_offset)
 
@@ -163,6 +171,7 @@ function run_model(sphere_offset, backdrop_offset)
 end
 
 function run_simplified_model(sphere_offset, backdrop_offset)
+    """Scan the v2 model."""
     x = 0:SCAN_STEP:SCAN_WH
     sphere_origin = Vector3(SCAN_WH/2, SCAN_WH/2, sphere_offset)
 
@@ -176,27 +185,24 @@ function run_simplified_model(sphere_offset, backdrop_offset)
 end
 
 function main()
-    println("Start!")
-
-    x = 0:SCAN_STEP:SCAN_WH
+    # Simplified ToF model (version 2 in the handoff doc)
     # zclose = run_simplified_model(150.0 + SPHERE_R, 400.0)
     zfar = run_simplified_model(150.0 + SPHERE_R, 1000.0)
+
+    # Complete ToF model (version 1 in the handoff doc)
+    # these take around 5 minutes to compute
+    # zclose = run_model(150.0 + SPHERE_R, 400.0)
+    # zfar = run_model(150.0 + SPHERE_R, 1000.0)
 
     text = JSON.json(zfar)
     out = open("outjson.json", "w")
     println(out, text)
     close(out)
 
+    # x = 0:SCAN_STEP:SCAN_WH
     # display(plot(x, x, zclose, st=:surface, camera=(-30, 30)))
     # display(plot(x, x, zfar, st=:surface, camera=(-30, 30)))
     # gui()
 end
-
-# outfd1 = open("profileout.txt", "w")
-# outfd2 = open("profileoutflat.txt", "w")
-# Profile.print(outfd1, format=:flat)
-# Profile.print(outfd2)
-# close(outfd1)
-# close(outfd2)
 
 main()
